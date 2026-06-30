@@ -1,0 +1,2 @@
+python lidar.py
+pause

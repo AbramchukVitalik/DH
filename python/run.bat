@@ -1,0 +1,2 @@
+python camera.py
+pause
