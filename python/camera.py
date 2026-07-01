@@ -12,7 +12,6 @@ RTSP_IR   = "rtsp://admin:123456abc*@192.168.10.13:554/media2/video0"
 OUT_MAIN = "main.mp4"
 OUT_IR   = "infrared.mp4"
 
-
 def record_stream(rtsp_url, output_file, fps=25):
     """Функция записи одного RTSP-потока"""
     global stop_flag
@@ -44,7 +43,6 @@ def record_stream(rtsp_url, output_file, fps=25):
     writer.release()
     print(f"Файл сохранён: {output_file}")
 
-
 def start_camera_recording():
     """Запуск записи двух потоков в отдельных потоках"""
     global stop_flag
@@ -60,15 +58,13 @@ def start_camera_recording():
 
     return t1, t2
 
-
 def stop_camera_recording():
     """Остановка записи"""
     global stop_flag
     stop_flag = True
     print("Остановка камер...")
 
-
-if __name__ == "__main__":
+def main():
     print("Начало записи")
     threads = start_camera_recording()
 
@@ -82,6 +78,5 @@ if __name__ == "__main__":
 
     print("Запись остановлена.")
 
-
-
-
+if __name__ == "__main__":
+    main()

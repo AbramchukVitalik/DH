@@ -27,7 +27,6 @@ frame_id = 0
 csv_file = open("lidar_raw.csv", mode="w", newline="", encoding="utf-8")
 csv_writer = csv.writer(csv_file)
 
-
 def calculate_checksum(packet_bytes_without_checksum):
     """
     Вычисляет контрольную сумму LIM через побитовый XOR (^) 32-битных слов.
@@ -44,7 +43,6 @@ def calculate_checksum(packet_bytes_without_checksum):
     for word in words:
         checksum ^= word 
     return checksum & 0xFFFFFFFF
-
 
 def pack_lim_head(n_code, data_array=[0, 0, 0, 0], ext_data_len=0):
     """Собирает структуру LIM_HEAD (ровно 40 байт) [cite: 147, 150]"""
@@ -65,7 +63,6 @@ def pack_lim_head(n_code, data_array=[0, 0, 0, 0], ext_data_len=0):
     full_packet = partial_packet + struct.pack("<I", checksum)
     return full_packet
 
-
 def heartbeat_thread(sock):
     """Отправка Heartbeat каждые 3 секунды (строго < 5 секунд по мануалу) [cite: 216]"""
     global is_running
@@ -80,7 +77,6 @@ def heartbeat_thread(sock):
                 print(f"[HEARTBEAT] Ошибка отправки: {e}")
             break
     print("[HEARTBEAT] Поток остановлен.")
-
 
 def parse_and_save_data(header_data, payload_bytes): 
     """Парсит LMD_INFO и массив точек """
@@ -112,7 +108,6 @@ def parse_and_save_data(header_data, payload_bytes):
         distances = struct.unpack(f"<{nMDataNum}H", distance_bytes)
         frame_id += 1
         csv_writer.writerow([frame_id] + list(distances))
-
 
 def receive_thread(sock): #НЕОБХОДИМО ИСПРАВЛЕНИЕ RSSI ПАКЕТОВ КОД 911 LIM_CODE_LMD_RSSI - РАСТОЯНИЯ И ИНТЕНСИВНОСТЬ
     """Поток непрерывного чтения сокета с защитой от таймаутов"""
@@ -159,7 +154,6 @@ def receive_thread(sock): #НЕОБХОДИМО ИСПРАВЛЕНИЕ RSSI ПА
                 print(f"[RECEIVE] Критическая ошибка при приеме данных: {e}")
             break
     print("[RECEIVE] Поток приема остановлен.")
-
 
 def main():
     global is_running
@@ -209,7 +203,6 @@ def main():
 
     csv_file.close()
     print("Программа успешно завершена. Данные сохранены.")
-
 
 if __name__ == "__main__":
     main()
