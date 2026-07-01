@@ -1,13 +1,12 @@
 import cv2
 import threading
 
-# RTSP каналы камеры
-RTSP_MAIN = "rtsp://admin:123456abc*@192.168.10.13:554/media/video0"
-RTSP_IR   = "rtsp://admin:123456abc*@192.168.10.13:554/media2/video0"
-
-# Выходные файлы
-OUT_MAIN = "main.mp4"
-OUT_IR   = "infrared.mp4"
+from config import (
+    RTSP_MAIN,
+    RTSP_IR,
+    OUT_MAIN,
+    OUT_IR,
+)
 
 def record_stream(rtsp_url, output_file, stop_event, fps=25):
     """Функция записи одного RTSP-потока"""

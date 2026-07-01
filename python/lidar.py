@@ -4,21 +4,19 @@ import time
 import threading
 import csv
 
-# --- НАСТРОЙКИ ПОДКЛЮЧЕНИЯ ---
-LIDAR_IP = "192.168.10.82"
-LIDAR_PORT = 2112  # Фиксированный TCP-порт из мануала [cite: 215]
-CLIENT_ID = 0
-
-# --- КОДЫ КОМАНД LIM [cite: 158] ---
-LIM_TAG = 0xF5EC96A5
-LIM_VER = 0x01000000
-
-LIM_CODE_HB = 10
-LIM_CODE_HBACK = 11
-LIM_CODE_LMD = 901
-LIM_CODE_LMD_RSSI = 911
-LIM_CODE_START_LMD = 1900
-LIM_CODE_STOP_LMD = 1902
+from config import (
+    LIDAR_IP,
+    LIDAR_PORT,
+    CLIENT_ID,
+    LIM_TAG,
+    LIM_VER,
+    LIM_CODE_HB,
+    LIM_CODE_HBACK,
+    LIM_CODE_LMD,
+    LIM_CODE_LMD_RSSI,
+    LIM_CODE_START_LMD,
+    LIM_CODE_STOP_LMD
+)
 
 header_written = False
 frame_id = 0
