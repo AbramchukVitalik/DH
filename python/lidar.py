@@ -20,7 +20,6 @@ LIM_CODE_LMD_RSSI = 911
 LIM_CODE_START_LMD = 1900
 LIM_CODE_STOP_LMD = 1902
 
-is_running = True
 header_written = False
 frame_id = 0
 
@@ -63,11 +62,11 @@ def pack_lim_head(n_code, data_array=[0, 0, 0, 0], ext_data_len=0):
     full_packet = partial_packet + struct.pack("<I", checksum)
     return full_packet
 
-def heartbeat_thread(sock):
+def heartbeat_thread(sock, stop_event):
     """Отправка Heartbeat каждые 3 секунды (строго < 5 секунд по мануалу) [cite: 216]"""
     global is_running
     print("[HEARTBEAT] Поток запущен.")
-    while is_running:
+    while not stop_event.is_set():
         try:
             hb_packet = pack_lim_head(LIM_CODE_HB)
             sock.sendall(hb_packet)
@@ -109,14 +108,14 @@ def parse_and_save_data(header_data, payload_bytes):
         frame_id += 1
         csv_writer.writerow([frame_id] + list(distances))
 
-def receive_thread(sock): #НЕОБХОДИМО ИСПРАВЛЕНИЕ RSSI ПАКЕТОВ КОД 911 LIM_CODE_LMD_RSSI - РАСТОЯНИЯ И ИНТЕНСИВНОСТЬ
+def receive_thread(sock, stop_event): #НЕОБХОДИМО ИСПРАВЛЕНИЕ RSSI ПАКЕТОВ КОД 911 LIM_CODE_LMD_RSSI - РАСТОЯНИЯ И ИНТЕНСИВНОСТЬ
     """Поток непрерывного чтения сокета с защитой от таймаутов"""
     global is_running
     print("[RECEIVE] Поток приема данных запущен.")
 
     buffer = b""
 
-    while is_running:
+    while not stop_event.is_set():
         try:
             data = sock.recv(65535)
             if not data:
@@ -155,7 +154,14 @@ def receive_thread(sock): #НЕОБХОДИМО ИСПРАВЛЕНИЕ RSSI ПА
             break
     print("[RECEIVE] Поток приема остановлен.")
 
-def main():
+def stop_lidar():
+    global is_running
+
+    print("Отправка команды STOP_LMD...")
+
+    is_running = False
+
+def start_lidar(stop_event):
     global is_running
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -170,8 +176,16 @@ def main():
         csv_file.close()
         return
 
-    thr_receive = threading.Thread(target=receive_thread, args=(sock,))
-    thr_heartbeat = threading.Thread(target=heartbeat_thread, args=(sock,))
+    thr_receive = threading.Thread(
+        target=receive_thread,
+        args=(sock, stop_event)
+    )
+
+    thr_heartbeat = threading.Thread(
+        target=heartbeat_thread,
+        args=(sock, stop_event)
+    )
+
     thr_receive.start()
     thr_heartbeat.start()
 
@@ -182,27 +196,31 @@ def main():
     start_packet = pack_lim_head(LIM_CODE_START_LMD, data_array=[0, 0, 0, 0])
     sock.sendall(start_packet)
 
-    input("\nНажмите ENTER для остановки сбора данных и завершения программы...\n")
+    while not stop_event.is_set():
+        time.sleep(0.2)
 
-    print("Отправка команды STOP_LMD...")
-    stop_packet = pack_lim_head(LIM_CODE_STOP_LMD, data_array=[0, 0, 0, 0])
+    print("Отправка STOP_LMD...")
+
+    stop_packet = pack_lim_head(LIM_CODE_STOP_LMD)
+
     try:
         sock.sendall(stop_packet)
-    except Exception as e:
-        print(f"Не удалось отправить команду STOP: {e}")
+    except:
+        pass
 
-    is_running = False
     try:
         sock.shutdown(socket.SHUT_RDWR)
     except:
         pass
-    sock.close() 
+
+    sock.close()
 
     thr_receive.join()
     thr_heartbeat.join()
 
     csv_file.close()
-    print("Программа успешно завершена. Данные сохранены.")
+
+    print("Лидар остановлен")
 
 if __name__ == "__main__":
-    main()
+    start_lidar()

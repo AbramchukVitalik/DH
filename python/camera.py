@@ -1,9 +1,6 @@
 import cv2
 import threading
 
-# Глобальный флаг остановки
-stop_flag = False
-
 # RTSP каналы камеры
 RTSP_MAIN = "rtsp://admin:123456abc*@192.168.10.13:554/media/video0"
 RTSP_IR   = "rtsp://admin:123456abc*@192.168.10.13:554/media2/video0"
@@ -12,7 +9,7 @@ RTSP_IR   = "rtsp://admin:123456abc*@192.168.10.13:554/media2/video0"
 OUT_MAIN = "main.mp4"
 OUT_IR   = "infrared.mp4"
 
-def record_stream(rtsp_url, output_file, fps=25):
+def record_stream(rtsp_url, output_file, stop_event, fps=25):
     """Функция записи одного RTSP-потока"""
     global stop_flag
 
@@ -32,7 +29,7 @@ def record_stream(rtsp_url, output_file, fps=25):
 
     print(f"Запись началась: {output_file}")
 
-    while not stop_flag:
+    while not stop_event.is_set():
         ret, frame = cap.read()
         if not ret:
             print(f"Поток пропал: {rtsp_url}")
@@ -43,13 +40,22 @@ def record_stream(rtsp_url, output_file, fps=25):
     writer.release()
     print(f"Файл сохранён: {output_file}")
 
-def start_camera_recording():
+def start_camera_recording(stop_event):
     """Запуск записи двух потоков в отдельных потоках"""
     global stop_flag
     stop_flag = False
 
-    t1 = threading.Thread(target=record_stream, args=(RTSP_MAIN, OUT_MAIN), daemon=True)
-    t2 = threading.Thread(target=record_stream, args=(RTSP_IR, OUT_IR), daemon=True)
+    t1 = threading.Thread(
+        target=record_stream,
+        args=(RTSP_MAIN, OUT_MAIN, stop_event),
+        daemon=True
+    )
+
+    t2 = threading.Thread(
+        target=record_stream,
+        args=(RTSP_IR, OUT_IR, stop_event),
+        daemon=True
+    )
 
     t1.start()
     t2.start()
@@ -64,14 +70,10 @@ def stop_camera_recording():
     stop_flag = True
     print("Остановка камер...")
 
-def main():
+def start_camera(stop_event):
     print("Начало записи")
-    threads = start_camera_recording()
 
-    print("Нажмите q + Enter для остановки.")
-    inp = input()
-    if inp.lower() == "q":
-        stop_camera_recording()
+    threads = start_camera_recording(stop_event)
 
     for t in threads:
         t.join()
@@ -79,4 +81,4 @@ def main():
     print("Запись остановлена.")
 
 if __name__ == "__main__":
-    main()
+    start_camera()
