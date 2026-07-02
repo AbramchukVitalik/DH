@@ -1,5 +1,6 @@
 import cv2
 import threading
+from abc import ABC, abstractmethod
 
 from config import (
     RTSP_MAIN,
@@ -8,76 +9,148 @@ from config import (
     OUT_IR,
 )
 
-def record_stream(rtsp_url, output_file, stop_event, fps=25):
-    """Функция записи одного RTSP-потока"""
-    global stop_flag
+# =========================
+# Интерфейс камеры
+# =========================
+class ICamera(ABC):
+    @abstractmethod
+    def open(self):
+        pass
 
-    cap = cv2.VideoCapture(rtsp_url)
-    if not cap.isOpened():
-        print(f"Не удалось открыть поток: {rtsp_url}")
-        return
+    @abstractmethod
+    def read(self):
+        pass
 
-    ret, frame = cap.read()
-    if not ret:
-        print(f"Не удалось получить кадр из: {rtsp_url}")
-        return
+    @abstractmethod
+    def release(self):
+        pass
 
-    height, width = frame.shape[:2]
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
 
-    print(f"Запись началась: {output_file}")
+# =========================
+# RTSP камера (реализация)
+# =========================
+class RTSPCamera(ICamera):
+    def __init__(self, url: str):
+        self.url = url
+        self.cap = None
 
-    while not stop_event.is_set():
-        ret, frame = cap.read()
+    def open(self):
+        self.cap = cv2.VideoCapture(self.url)
+        return self.cap.isOpened()
+
+    def read(self):
+        if self.cap is None:
+            return False, None
+        return self.cap.read()
+
+    def release(self):
+        if self.cap:
+            self.cap.release()
+            self.cap = None
+
+
+# =========================
+# Класс записи потока
+# =========================
+class StreamRecorder:
+    def __init__(self, camera: ICamera, output_file: str, fps: int = 25):
+        self.camera = camera
+        self.output_file = output_file
+        self.fps = fps
+
+        self.stop_event = threading.Event()
+        self.thread = None
+
+        self.writer = None
+
+    def start(self):
+        self.thread = threading.Thread(target=self._record, daemon=True)
+        self.thread.start()
+
+    def stop(self):
+        self.stop_event.set()
+        if self.thread:
+            self.thread.join()
+
+    def _record(self):
+        if not self.camera.open():
+            print("Не удалось открыть камеру")
+            return
+
+        ret, frame = self.camera.read()
         if not ret:
-            print(f"Поток пропал: {rtsp_url}")
-            continue
-        writer.write(frame)
+            print("Не удалось получить кадр")
+            return
 
-    cap.release()
-    writer.release()
-    print(f"Файл сохранён: {output_file}")
+        h, w = frame.shape[:2]
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        self.writer = cv2.VideoWriter(self.output_file, fourcc, self.fps, (w, h))
 
-def start_camera_recording(stop_event):
-    """Запуск записи двух потоков в отдельных потоках"""
-    global stop_flag
-    stop_flag = False
+        print(f"Запись началась: {self.output_file}")
 
-    t1 = threading.Thread(
-        target=record_stream,
-        args=(RTSP_MAIN, OUT_MAIN, stop_event),
-        daemon=True
-    )
+        while not self.stop_event.is_set():
+            ret, frame = self.camera.read()
+            if not ret:
+                print("Поток пропал")
+                continue
 
-    t2 = threading.Thread(
-        target=record_stream,
-        args=(RTSP_IR, OUT_IR, stop_event),
-        daemon=True
-    )
+            self.writer.write(frame)
 
-    t1.start()
-    t2.start()
+        self._cleanup()
 
-    print("Камеры запущены.")
+    def _cleanup(self):
+        if self.writer:
+            self.writer.release()
+        self.camera.release()
+        print(f"Файл сохранён: {self.output_file}")
 
-    return t1, t2
 
-def stop_camera_recording():
-    """Остановка записи"""
-    global stop_flag
-    stop_flag = True
-    print("Остановка камер...")
+# =========================
+# Менеджер камер
+# =========================
+class CameraManager:
+    def __init__(self):
+        self.recorders = []
+        self._running = False
+
+    def add_recorder(self, recorder):
+        self.recorders.append(recorder)
+
+    def start(self):
+        print("Запуск всех камер...")
+        self._running = True
+
+        for r in self.recorders:
+            r.start()
+
+    def stop(self):
+        print("Остановка всех камер...")
+        self._running = False
+
+        for r in self.recorders:
+            r.stop()
+
 
 def start_camera(stop_event):
-    print("Начало записи")
+    manager = CameraManager()
 
-    threads = start_camera_recording(stop_event)
+    cameras = [
+        (RTSP_MAIN, OUT_MAIN),
+        (RTSP_IR, OUT_IR),
+    ]
 
-    for t in threads:
-        t.join()
+    for url, out in cameras:
+        cam = RTSPCamera(url)
+        rec = StreamRecorder(cam, out)
+        manager.add_recorder(rec)
 
-    print("Запись остановлена.")
+    manager.start()
 
+    # нормальное ожидание остановки
+    stop_event.wait()
+
+    manager.stop()
+   
+   
 if __name__ == "__main__":
     start_camera()
