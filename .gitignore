@@ -1,3 +1,7 @@
 .venv
 .env
 __pycache__
+lidar_raw.csv
+infrared.mp4
+main.mp4
+lidar_animation.mp4
